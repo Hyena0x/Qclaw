@@ -389,7 +389,7 @@ export async function waitForDashboardGatewayRunning(
     execute: async () => {
       lastHealth = await api.gatewayHealth().catch(() => ({
         running: false,
-        summary: 'Gateway 尚未确认可用',
+        summary: '网关暂时不可用',
       }))
       return lastHealth
     },
@@ -410,9 +410,24 @@ export async function waitForDashboardGatewayRunning(
       String(failedHealth?.summary || '').trim() ||
       String(failedHealth?.stderr || '').trim() ||
       String(failedHealth?.raw || '').trim() ||
-      'Gateway 尚未确认可用',
+      '网关暂时不可用',
   }
 }
+
+function resolveDashboardActionErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+  safeUiMessages: string[] = []
+): string {
+  if (error instanceof Error && safeUiMessages.includes(error.message)) {
+    return error.message
+  }
+
+  return fallbackMessage
+}
+
+const DEFAULT_MODEL_SWITCH_FAILURE_MESSAGE = '默认模型切换失败，请稍后重试。'
+const DASHBOARD_PLUGIN_CENTER_FAILURE_MESSAGE = '插件处理失败，请稍后重试。'
 
 function extractChannelsFromConfig(config: Record<string, any> | null): ChannelInfo[] {
   if (!config || typeof config !== 'object') return []
@@ -750,14 +765,16 @@ export default function Dashboard({
         }
       }
       if (!result.ok) {
-        setModelError(result.message || '默认模型切换失败')
+        console.error('default model switch failed', result)
+        setModelError(DEFAULT_MODEL_SWITCH_FAILURE_MESSAGE)
       }
       await fetchConfig()
       if (result.ok) {
         await refreshCatalog({ forceRefresh: true })
       }
     } catch (error) {
-      setModelError(error instanceof Error ? error.message : String(error))
+      console.error('default model switch failed', error)
+      setModelError(DEFAULT_MODEL_SWITCH_FAILURE_MESSAGE)
     } finally {
       setSwitching('')
     }
@@ -825,7 +842,7 @@ export default function Dashboard({
       autoClose: false,
       withCloseButton: false,
       title: '正在处理',
-      message: '正在执行网关重载，请稍候...',
+      message: '正在重新连接网关，请稍候...',
     })
     try {
       const result = await window.api.reloadGatewayManual()
@@ -836,14 +853,14 @@ export default function Dashboard({
         gatewayHealth: () => window.api.gatewayHealth(),
       })
       if (!readyResult.ok) {
-        throw new Error(`网关重载命令已执行，但 ${readyResult.message}`)
+        throw new Error('已执行重新启动，但网关暂时不可用。')
       }
       await fetchGatewayStatus()
       notifications.hide(notificationId)
       notifications.show({
         color: 'teal',
-        title: '操作完成',
-        message: gateway.running ? '网关已重启完成' : '网关已启动完成',
+        title: '处理完成',
+        message: gateway.running ? '网关已重新启动完成' : '网关已启动完成',
         autoClose: 1800,
       })
     } catch (e) {
@@ -851,8 +868,10 @@ export default function Dashboard({
       notifications.hide(notificationId)
       notifications.show({
         color: 'red',
-        title: '操作失败',
-        message: e instanceof Error ? e.message : '网关重载失败，请稍后重试',
+        title: '处理失败',
+        message: resolveDashboardActionErrorMessage(e, '暂时无法重新连接网关，请稍后重试。', [
+          '已执行重新启动，但网关暂时不可用。',
+        ]),
         autoClose: 3500,
       })
     } finally {
@@ -883,7 +902,7 @@ export default function Dashboard({
       autoClose: false,
       withCloseButton: false,
       title: '正在处理',
-      message: '正在执行强制重启，请稍候...',
+      message: '正在强制重启网关，请稍候...',
     })
     try {
       const result = await window.api.gatewayForceRestart()
@@ -894,13 +913,13 @@ export default function Dashboard({
         gatewayHealth: () => window.api.gatewayHealth(),
       })
       if (!readyResult.ok) {
-        throw new Error(`强制重启命令已执行，但 ${readyResult.message}`)
+        throw new Error('已执行强制重启，但网关暂时不可用。')
       }
       await fetchGatewayStatus()
       notifications.hide(notificationId)
       notifications.show({
         color: 'teal',
-        title: '操作完成',
+        title: '处理完成',
         message: '网关已强制重启完成',
         autoClose: 1800,
       })
@@ -909,8 +928,10 @@ export default function Dashboard({
       notifications.hide(notificationId)
       notifications.show({
         color: 'red',
-        title: '操作失败',
-        message: e instanceof Error ? e.message : '强制重启失败，请稍后重试',
+        title: '处理失败',
+        message: resolveDashboardActionErrorMessage(e, '强制重启失败，请稍后重试。', [
+          '已执行强制重启，但网关暂时不可用。',
+        ]),
         autoClose: 3500,
       })
     } finally {
@@ -925,7 +946,7 @@ export default function Dashboard({
       autoClose: false,
       withCloseButton: false,
       title: '正在处理',
-      message: '正在执行自检修复，请稍候...',
+      message: '正在检查并修复网关，请稍候...',
     })
     try {
       const result = await window.api.ensureGatewayRunning()
@@ -936,8 +957,8 @@ export default function Dashboard({
       notifications.hide(notificationId)
       notifications.show({
         color: 'teal',
-        title: '操作完成',
-        message: '自检修复完成，网关已恢复可用',
+        title: '处理完成',
+        message: '检查修复完成，网关已恢复可用。',
         autoClose: 1800,
       })
     } catch (e) {
@@ -945,8 +966,8 @@ export default function Dashboard({
       notifications.hide(notificationId)
       notifications.show({
         color: 'red',
-        title: '操作失败',
-        message: e instanceof Error ? e.message : '自检修复失败，请稍后重试',
+        title: '处理失败',
+        message: resolveDashboardActionErrorMessage(e, '检查修复失败，请稍后重试。'),
         autoClose: 3500,
       })
     } finally {
@@ -981,7 +1002,7 @@ export default function Dashboard({
     setPluginCenterPreserveStateOnNextOpen(false)
     setPluginCenterActionId(action.id)
     setPluginCenterPhaseTitle(`正在修复 ${action.channelName} 插件`)
-    setPluginCenterPhaseDetail('先检查坏插件环境，再安装对应官方插件。')
+    setPluginCenterPhaseDetail('先检查损坏插件环境，再安装对应官方插件。')
     setPluginCenterError('')
     setPluginCenterSummary('')
     setPluginCenterLog('')
@@ -1013,14 +1034,14 @@ export default function Dashboard({
         const gatewayReady = reloadResult.ok && reloadResult.running === true
         if (!gatewayReady) {
           if (isDashboardPluginCenterRepairableReloadState(reloadResult.stateCode)) {
-            appendPluginCenterLog(`⚠️ Gateway 重载命中可修复状态：${reloadResult.summary || reloadResult.stderr || '待继续复检'}`)
+            appendPluginCenterLog(`⚠️ 网关重载命中可修复状态：${reloadResult.summary || reloadResult.stderr || '待继续复检'}`)
             const ensureResult = await window.api.ensureGatewayRunning({ skipRuntimePrecheck: true })
             if (!ensureResult.ok || ensureResult.running !== true) {
               throw new Error(
                 ensureResult.summary
                   || ensureResult.stderr
                   || ensureResult.stdout
-                  || 'Gateway 重载失败'
+                  || '网关重载失败'
               )
             }
             const targetStatus = await window.api.getManagedChannelPluginStatus(action.id)
@@ -1032,7 +1053,7 @@ export default function Dashboard({
               reloadResult.summary
                 || reloadResult.stderr
                 || reloadResult.stdout
-                || 'Gateway 重载失败'
+                || '网关重载失败'
             )
           }
         }
@@ -1053,15 +1074,15 @@ export default function Dashboard({
       })
     } catch (error) {
       stopPluginCenterProgressTimer()
-      const message = error instanceof Error ? error.message : String(error)
-      setPluginCenterError(message)
+      console.error(`${action.channelName} plugin repair failed`, error)
+      setPluginCenterError(DASHBOARD_PLUGIN_CENTER_FAILURE_MESSAGE)
       setPluginCenterPhaseTitle(`${action.channelName} 插件处理失败`)
-      setPluginCenterPhaseDetail('可以稍后重试，或根据错误信息继续排查。')
-      appendPluginCenterLog(`❌ ${action.channelName} 插件处理失败：${message}`)
+      setPluginCenterPhaseDetail('可以稍后重试；如果问题持续存在，请查看控制台日志继续排查。')
+      appendPluginCenterLog(`❌ ${action.channelName} 插件处理失败，请稍后重试。`)
       notifications.show({
         color: 'red',
         title: `${action.channelName} 插件处理失败`,
-        message,
+        message: DASHBOARD_PLUGIN_CENTER_FAILURE_MESSAGE,
         autoClose: 4500,
       })
     } finally {
@@ -1098,7 +1119,7 @@ export default function Dashboard({
         <Alert
           color="yellow"
           variant="light"
-          title="已自动隔离坏插件"
+          title="已自动隔离损坏插件"
           withCloseButton
           onClose={() => setPluginRepairNoticeVisible(false)}
         >
@@ -1109,7 +1130,7 @@ export default function Dashboard({
         <Alert
           color="red"
           variant="light"
-          title="坏插件环境修复失败"
+          title="损坏插件环境修复失败"
           withCloseButton
           onClose={() => setPluginRepairErrorVisible(false)}
         >
@@ -1477,7 +1498,7 @@ export default function Dashboard({
               }}
               className="app-text-muted"
             />
-            <Text size="sm" fw={600} className="app-text-primary">IM 渠道</Text>
+            <Text size="sm" fw={600} className="app-text-primary">消息渠道</Text>
             <Badge variant="outline" color="gray" size="xs">
               {channels.length}
             </Badge>
@@ -1510,7 +1531,7 @@ export default function Dashboard({
                 })}
               </Group>
             ) : (
-              <Text size="xs" c="dimmed">暂无配置的 IM 渠道</Text>
+              <Text size="xs" c="dimmed">暂无配置的消息渠道</Text>
             )}
           </div>
         </Collapse>
@@ -1527,10 +1548,6 @@ export default function Dashboard({
         closeOnEscape={!pluginCenterRunning}
         withCloseButton={!pluginCenterRunning}
       >
-        <Text size="sm" className="app-text-secondary" mb="md">
-          选择一个渠道后，Qclaw 会先检查并修复坏插件环境，再安装对应插件。整个过程中都会显示进度条。
-        </Text>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {DASHBOARD_PLUGIN_ACTIONS.map((action) => (
             <Button

@@ -291,5 +291,5 @@ export function buildFeishuInstallerPromptHookScript(): string {
     "  return target;",
     "}",
     "",
-  ].join('\n');
+  ].join('\n')
 }

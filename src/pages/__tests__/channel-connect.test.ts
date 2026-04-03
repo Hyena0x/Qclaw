@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as ChannelConnectModule from '../ChannelConnect'
+import channelConnectSource from '../ChannelConnect.tsx?raw'
 import {
   buildManagedPluginScopedRepairOptions,
   buildDingtalkOfficialSetupLog,
@@ -26,6 +27,27 @@ import {
   shouldValidateFeishuManualCredentials,
 } from '../ChannelConnect'
 import { getChannelDefinition } from '../../lib/openclaw-channel-registry'
+describe('ChannelConnect source copy cleanup', () => {
+  it('does not keep the redundant top-level setup helper copy', () => {
+    expect(channelConnectSource).not.toContain('选择并配置您的即时通讯平台')
+  })
+
+  it('does not render shared channel helper copy or auto-install copy blocks', () => {
+    expect(channelConnectSource).not.toMatch(/\{selectedChannel\.helpText\}/)
+    expect(channelConnectSource).not.toContain('将自动安装:')
+  })
+
+  it('does not keep the redundant feishu create-mode helper copy', () => {
+    expect(channelConnectSource).not.toContain('选择“新建机器人”')
+    expect(channelConnectSource).not.toContain('使用飞书扫码创建新的官方机器人即可。')
+    expect(channelConnectSource).not.toContain('打开飞书官网使用指南')
+  })
+
+  it('does not keep the redundant weixin helper paragraphs', () => {
+    expect(channelConnectSource).not.toContain('点击“开始连接”后，Qclaw 会安装个人微信插件')
+    expect(channelConnectSource).not.toContain('如果二维码过期，安装器会自动刷新；连接成功后')
+  })
+})
 describe('shouldShowChannelConnectSkipButton', () => {
   it('stays hidden by default when the channel has not earned skip availability yet', () => {
     expect(
@@ -108,7 +130,7 @@ describe('ensureGatewayReadyForChannelConnect', () => {
 
     expect(result.ok).toBe(true)
     expect(appendLog).toHaveBeenCalledWith(
-      '⚠️ Gateway 端口已自动切换到 19876，程序会继续使用新端口。\n\n'
+      '⚠️ 网关端口已自动切换到 19876，程序会继续使用新端口。\n\n'
     )
   })
 
@@ -126,7 +148,7 @@ describe('ensureGatewayReadyForChannelConnect', () => {
       appendLog
     )
 
-    expect(result).toEqual({ ok: false, message: 'Gateway 启动失败' })
+    expect(result).toEqual({ ok: false, message: '网关启动失败' })
     expect(reloadGatewayAfterChannelChange).toHaveBeenCalledTimes(1)
     expect(appendLog).not.toHaveBeenCalled()
   })

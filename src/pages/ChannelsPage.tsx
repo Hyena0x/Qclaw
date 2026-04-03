@@ -30,7 +30,6 @@ import type { ManagedChannelPluginStatusView } from '../shared/managed-channel-p
 import {
   getOfficialChannelStageColor,
   getOfficialChannelStageLabel,
-  getOfficialChannelStageStateLabel,
 } from '../shared/official-channel-status-view'
 import { runManagedChannelRepairFlow } from '../shared/managed-channel-repair'
 import { resolveManagedChannelIdentity } from '../shared/managed-channel-identity'
@@ -93,6 +92,12 @@ export function getChannelEnabledLabel(enabled: boolean): string {
 
 export function shouldShowPluginStatus(channel: Pick<ChannelInfo, 'pluginStatus'>): boolean {
   return Boolean(channel.pluginStatus)
+}
+
+export function getVisiblePluginStatusStages(
+  pluginStatus: Pick<ManagedChannelPluginStatusView, 'stages'> | null | undefined
+) {
+  return (pluginStatus?.stages || []).filter((stage) => stage.state !== 'unknown')
 }
 
 export function shouldShowFeishuPluginRepairAction(
@@ -394,7 +399,7 @@ export default function ChannelsPage() {
       if (statusResult.ok) {
         nextRuntimeModel = extractPrimaryModelFromModelStatusPayload(statusData)
       } else {
-        errors.push(statusResult.message || statusResult.stderr || '读取当前 Bot 模型失败')
+        errors.push(statusResult.message || statusResult.stderr || '读取当前机器人模型失败')
       }
 
       try {
@@ -410,7 +415,7 @@ export default function ChannelsPage() {
       }
 
       if (!nextOptions.length) {
-        errors.push('模型目录为空，暂时无法为这个 Bot 选择模型')
+        errors.push('模型目录为空，暂时无法为这个机器人选择模型')
       }
 
       nextOptions = ensureModelSelectOption(nextOptions, nextRuntimeModel)
@@ -425,13 +430,13 @@ export default function ChannelsPage() {
 
   const handleSaveBotModel = async () => {
     if (!selectedModelChannel?.agentId) {
-      setModelModalError('当前飞书 Bot 缺少 Agent ID，无法配置模型')
+      setModelModalError('当前飞书机器人缺少 Agent ID，无法配置模型')
       return
     }
 
     const model = String(selectedModelValue || '').trim()
     if (!model) {
-      setModelModalError('请选择要应用到这个飞书 Bot 的模型')
+      setModelModalError('请选择要应用到这个飞书机器人的模型')
       return
     }
 
@@ -449,14 +454,14 @@ export default function ChannelsPage() {
       })
 
       if (!result.ok) {
-        setModelModalError(result.message || '飞书 Bot 模型切换失败')
+        setModelModalError(result.message || '飞书机器人模型切换失败')
         return
       }
 
       closeModelModal({ force: true })
       await fetchChannels({ background: true })
     } catch (e) {
-      setModelModalError('飞书 Bot 模型切换失败: ' + (e as Error).message)
+      setModelModalError('飞书机器人模型切换失败: ' + (e as Error).message)
     } finally {
       setSavingModel(false)
     }
@@ -574,7 +579,7 @@ export default function ChannelsPage() {
           reason: 'channels-remove-channel',
         })
         if (!writeResult.ok) {
-          throw new Error(writeResult.message || '共享配置写入失败')
+          throw new Error(writeResult.message || '配置文件写入失败')
         }
         await fetchChannels({ background: true })
       }
@@ -613,11 +618,11 @@ export default function ChannelsPage() {
         } else {
           const accounts = nextConfig.channels.feishu.accounts as Record<string, any> | undefined
           if (!accounts || typeof accounts !== 'object' || !accounts[channel.pairingAccountId]) {
-            throw new Error(`未找到飞书 Bot 账号: ${channel.pairingAccountId}`)
+            throw new Error(`未找到飞书机器人账号: ${channel.pairingAccountId}`)
           }
           const accountConfig = accounts[channel.pairingAccountId]
           if (!accountConfig || typeof accountConfig !== 'object' || Array.isArray(accountConfig)) {
-            throw new Error(`飞书 Bot 账号配置异常: ${channel.pairingAccountId}`)
+            throw new Error(`飞书机器人账号配置异常: ${channel.pairingAccountId}`)
           }
           accountConfig.enabled = nextEnabled
         }
@@ -661,7 +666,7 @@ export default function ChannelsPage() {
         reason: 'unknown',
       })
       if (!writeResult.ok) {
-        throw new Error(writeResult.message || '共享配置写入失败')
+        throw new Error(writeResult.message || '配置文件写入失败')
       }
       await fetchChannels({ background: true })
     } catch (e) {
@@ -691,10 +696,7 @@ export default function ChannelsPage() {
     <div className="p-6 space-y-6">
       <Group justify="space-between">
         <div>
-          <Text size="xl" fw={700}>IM 渠道管理</Text>
-          <Text size="sm" c="dimmed" mt={4}>
-            配置和管理飞书、企微、钉钉、QQ 等 IM 渠道
-          </Text>
+          <Text size="xl" fw={700}>消息渠道管理</Text>
         </div>
         <Group gap="sm">
           <Button
@@ -731,7 +733,7 @@ export default function ChannelsPage() {
 
       {legacyFeishuAgentIds.length > 0 && (
         <Alert color="yellow" title="检测到历史遗留飞书 Agent">
-          检测到未绑定当前飞书渠道配置的独立 Agent：{legacyFeishuAgentIds.join('、')}。它们不会出现在“每个飞书 Bot 单独配置模型”的当前入口里，避免误操作到历史残留配置。
+          检测到未绑定当前飞书渠道配置的独立 Agent：{legacyFeishuAgentIds.join('、')}。它们不会出现在“每个飞书机器人单独配置模型”的当前入口里，避免误操作到历史残留配置。
         </Alert>
       )}
 
@@ -740,7 +742,7 @@ export default function ChannelsPage() {
           {channels.length === 0 ? (
             <Card padding="xl" withBorder className="text-center">
               <Text size="sm" c="dimmed">
-                暂无配置的 IM 渠道，点击"添加渠道"开始配置
+                暂无配置的消息渠道，点击"添加渠道"开始配置
               </Text>
             </Card>
           ) : (
@@ -779,19 +781,6 @@ export default function ChannelsPage() {
                             {platformInfo.name}
                           </Badge>
                         </Group>
-                        <Text size="xs" c="dimmed" mt={4}>
-                          ID: {channel.id}
-                        </Text>
-                        {!channel.isFeishuBot && channel.configChannelId !== channel.channelId && (
-                          <Text size="xs" c="dimmed" mt={4}>
-                            渠道标识：{channel.channelId}
-                          </Text>
-                        )}
-                        {channel.agentId && (
-                          <Text size="xs" c="dimmed" mt={4}>
-                            Agent: {channel.agentId}
-                          </Text>
-                        )}
                         <Group gap="xs" mt={8}>
                           <Badge variant="light" size="sm" color={channel.enabled ? 'teal' : 'gray'}>
                             {getChannelEnabledLabel(channel.enabled)}
@@ -806,34 +795,17 @@ export default function ChannelsPage() {
                             </Badge>
                           )}
                         </Group>
-                        <Text size="xs" c="dimmed" mt={6}>
-                          {channel.pairingRequired
-                            ? channel.channelId === 'openclaw-weixin'
-                              ? '点击卡片可为这个个人微信账号批准其他用户的配对授权。'
-                              : '点击卡片可进入这个 Bot 的配对管理。'
-                            : channel.channelId === 'openclaw-weixin'
-                              ? '当前个人微信仅支持扫码登录的这个微信账号使用，暂不支持给其他微信用户做配对授权。'
-                            : `${platformInfo.name} 渠道接入后无需额外配对。`}
-                        </Text>
-                        {channel.channelId === 'feishu' && channel.runtimeSummary && (
-                          <Text size="xs" c="dimmed" mt={6}>
-                            运行状态：{channel.runtimeSummary}
-                          </Text>
-                        )}
-                        {shouldShowPluginStatus(channel) && channel.pluginStatus && (
+                        {shouldShowPluginStatus(channel) && channel.pluginStatus && getVisiblePluginStatusStages(channel.pluginStatus).length > 0 && (
                           <div className="mt-3 space-y-2">
-                            <Text size="xs" c="dimmed">
-                              插件状态：{channel.pluginStatus.summary}
-                            </Text>
                             <Group gap="xs">
-                              {channel.pluginStatus.stages.map((stage) => (
+                              {getVisiblePluginStatusStages(channel.pluginStatus).map((stage) => (
                                 <Badge
                                   key={`${channel.id}:${stage.id}`}
                                   variant="light"
                                   size="sm"
                                   color={getOfficialChannelStageColor(stage.state)}
                                 >
-                                  {getOfficialChannelStageLabel(stage.id)} · {getOfficialChannelStageStateLabel(stage.state)}
+                                  {getOfficialChannelStageLabel(stage.id)}
                                 </Badge>
                               ))}
                             </Group>
@@ -1038,7 +1010,7 @@ export default function ChannelsPage() {
               <Alert
                 color={selectedPairingChannel.runtimeState === 'online' ? 'green' : selectedPairingChannel.runtimeState === 'degraded' ? 'yellow' : 'red'}
                 variant="light"
-                title="当前运行态"
+                title="当前运行状态"
               >
                 {selectedPairingChannel.runtimeSummary}
               </Alert>
@@ -1062,16 +1034,10 @@ export default function ChannelsPage() {
       <Modal
         opened={showModelModal}
         onClose={closeModelModal}
-        title={selectedModelChannel ? `${selectedModelChannel.name} 模型配置` : '飞书 Bot 模型配置'}
+        title={selectedModelChannel ? `${selectedModelChannel.name} 模型配置` : '飞书机器人模型配置'}
         size="lg"
       >
         <div className="space-y-4">
-          {selectedModelChannel?.agentId && (
-            <Text size="sm" c="dimmed">
-              Agent: {selectedModelChannel.agentId}
-            </Text>
-          )}
-
           {currentRuntimeModel && (
             <Alert color="blue" variant="light" title="当前运行模型">
               {currentRuntimeModel}
@@ -1091,7 +1057,7 @@ export default function ChannelsPage() {
           ) : (
             <Select
               label="主模型"
-              placeholder="选择要绑定到这个飞书 Bot 的模型"
+              placeholder="选择要绑定到这个飞书机器人的模型"
               data={modelOptions}
               value={selectedModelValue}
               onChange={setSelectedModelValue}

@@ -6,7 +6,6 @@ import FeishuInstallTutorialModal from '../components/FeishuInstallTutorialModal
 import {
   applyChannelConfig,
   getChannelDefinition,
-  getChannelPluginInstallLabel,
   isChannelPluginConfigured,
   isPluginAlreadyInstalledError,
   listChannelDefinitions,
@@ -139,7 +138,7 @@ function getGatewayReadyFailureMessage(
     stderr: string
     stdout: string
   }>,
-  fallback = 'Gateway 启动失败'
+  fallback = '网关启动失败'
 ): string {
   const summary = String(result.summary || '').trim()
   if (summary) return summary
@@ -165,7 +164,7 @@ function getManagedChannelRepairFailureMessage(result: ManagedPluginRepairResult
   if (result.kind === 'quarantine-failed') {
     return result.status.summary || `插件隔离失败：${result.failureKind}`
   }
-  return result.status.summary || 'Gateway 启动失败'
+  return result.status.summary || '网关启动失败'
 }
 
 export async function resolveManagedPluginInstallPreflight(
@@ -258,7 +257,7 @@ async function writeConfigDirect(
 ) {
   const result = await window.api.writeConfigGuarded({ config, reason })
   if (!result.ok) {
-    throw new Error(result.message || '共享配置写入失败')
+    throw new Error(result.message || '配置文件写入失败')
   }
 }
 
@@ -273,7 +272,7 @@ async function writeConfigPatch(
     reason,
   })
   if (!result.ok) {
-    throw new Error(result.message || '共享配置写入失败')
+    throw new Error(result.message || '配置文件写入失败')
   }
 }
 
@@ -283,7 +282,7 @@ export function buildChannelConnectCompletionCopy(
   if (!channel) return ''
   if (channel.id === 'dingtalk') {
     return [
-      '⚠️ 当前只确认插件安装、最小配置补丁和 Gateway 重载已完成。',
+      '⚠️ 当前只确认插件安装、最小配置补丁和网关重载已完成。',
       '钉钉 `loaded / ready` 仍待上游状态证明，当前状态按 `unknown / 未证实` 处理。',
     ].join('\n')
   }
@@ -491,7 +490,7 @@ export function mergeFeishuCreateModeBots(params: {
     const matchedBot = listFeishuBots(nextConfig).find((candidate) => candidate.accountId === added.accountId)
     addedBots.push({
       accountId: added.accountId,
-      accountName: matchedBot?.name || credentials.name || bot.name || `Bot ${added.accountId}`,
+      accountName: matchedBot?.name || credentials.name || bot.name || `机器人 ${added.accountId}`,
       appId: credentials.appId,
     })
     mergedAppIds.add(normalizedAppId)
@@ -802,14 +801,14 @@ export async function ensureGatewayReadyForChannelConnect(
         ensureResult.autoPortMigrated === true &&
         typeof ensureResult.effectivePort === 'number'
       ) {
-        appendLog(`⚠️ Gateway 端口已自动切换到 ${ensureResult.effectivePort}，程序会继续使用新端口。\n\n`)
+        appendLog(`⚠️ 网关端口已自动切换到 ${ensureResult.effectivePort}，程序会继续使用新端口。\n\n`)
       }
 
       const status = await api.getManagedChannelPluginStatus(managedChannel.channelId).catch(() => null)
       if (!status || !hasVerifiedManagedPluginInstallAndRegistration(status)) {
         return {
           ok: false,
-          message: status?.summary || 'Gateway 启动失败',
+          message: status?.summary || '网关启动失败',
         }
       }
 
@@ -828,7 +827,7 @@ export async function ensureGatewayReadyForChannelConnect(
     'effectivePort' in result &&
     typeof result.effectivePort === 'number'
   ) {
-    appendLog(`⚠️ Gateway 端口已自动切换到 ${result.effectivePort}，程序会继续使用新端口。\n\n`)
+    appendLog(`⚠️ 网关端口已自动切换到 ${result.effectivePort}，程序会继续使用新端口。\n\n`)
   }
 
   return { ok: true }
@@ -1540,7 +1539,7 @@ export default function ChannelConnect({
         throw new Error(
           toUserFacingCliFailureMessage({
             stderr: gatewayReady.message,
-            fallback: 'Gateway 启动失败',
+            fallback: '网关启动失败',
           })
         )
       }
@@ -1696,14 +1695,14 @@ export default function ChannelConnect({
         const existingBots = listFeishuBots(config)
         if (existingBots.length > 0) {
           const added = addFeishuBotConfig(config, {
-            name: String(formData.name || '').trim() || '飞书 Bot',
+            name: String(formData.name || '').trim() || '飞书机器人',
             appId: channelValidation.values.appId,
             appSecret: channelValidation.values.appSecret,
           })
           nextConfig = added.nextConfig
           pairingTarget = {
             accountId: added.accountId,
-            accountName: String(formData.name || '').trim() || `Bot ${added.accountId}`,
+            accountName: String(formData.name || '').trim() || `机器人 ${added.accountId}`,
           }
         } else {
           nextConfig = applyChannelConfig(config, 'feishu', channelValidation.values)
@@ -1769,7 +1768,7 @@ export default function ChannelConnect({
         throw new Error(
           toUserFacingCliFailureMessage({
             stderr: gatewayReady.message,
-            fallback: 'Gateway 启动失败',
+            fallback: '网关启动失败',
           })
         )
       }
@@ -2162,8 +2161,8 @@ export default function ChannelConnect({
         }
       }
 
-      // 启动或重启 Gateway
-      setLog(prev => prev + '正在启动 Gateway...\n')
+      // 启动或重启网关
+      setLog(prev => prev + '正在启动网关...\n')
       const gatewayReady = await ensureGatewayReadyForChannelConnect(window.api, (message) => {
         setLog(prev => prev + message)
       }, { channelId: selectedChannel.id })
@@ -2171,14 +2170,14 @@ export default function ChannelConnect({
         setError(
           toUserFacingCliFailureMessage({
             stderr: gatewayReady.message,
-            fallback: 'Gateway 启动失败',
+            fallback: '网关启动失败',
           })
         )
         setStatus('error')
         return
       }
 
-      setLog(prev => prev + '✅ Gateway 已启动\n')
+      setLog(prev => prev + '✅ 网关已启动\n')
 
       if (selectedChannel.id !== 'dingtalk') {
         // 飞书/企微等渠道需要等待长连接初始化。
@@ -2201,8 +2200,7 @@ export default function ChannelConnect({
 
   return (
     <div className="w-full">
-      <Title order={3} size="lg" fw={600} mb={4}>连接 IM 渠道</Title>
-      <Text size="sm" c="dimmed" mb="lg">选择并配置您的即时通讯平台</Text>
+      <Title order={3} size="lg" fw={600} mb={4}>连接消息渠道</Title>
 
       {status === 'form' && (
         <>
@@ -2236,8 +2234,6 @@ export default function ChannelConnect({
                   帮助 →
                 </a>
               </div>
-
-              <Text size="xs" c="dimmed">{selectedChannel.helpText}</Text>
 
               {selectedChannel.id === 'feishu' ? (
                 <div className="space-y-4">
@@ -2364,22 +2360,6 @@ export default function ChannelConnect({
                         </div>
                       )}
 
-                      <div className="space-y-2 text-xs leading-6 app-text-tertiary">
-                        <p className="font-medium app-text-secondary">选择“新建机器人”</p>
-                        <p>使用飞书扫码创建新的官方机器人即可。</p>
-                        <a
-                          href={FEISHU_OFFICIAL_GUIDE_URL}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex text-[11px] app-text-success hover:opacity-80"
-                        >
-                          打开飞书官网使用指南
-                        </a>
-                        <p className="text-[11px] leading-5 app-text-muted">
-                          如果你已经在飞书开放平台创建好了机器人，请点击上方“关联已有机器人”，
-                          Qclaw 会先确认飞书官方插件真实可用；缺失时会先自动补装，再开放手动绑定。
-                        </p>
-                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -2439,7 +2419,7 @@ export default function ChannelConnect({
                   {(feishuInstallerRunning || feishuInstallerOutput.trim() || feishuInstallerExitCode !== null) && (
                     <Card withBorder radius="md" padding="md" className="app-bg-secondary">
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <Text size="sm" fw={600}>官方安装器输出</Text>
+                        <Text size="sm" fw={600}>安装日志</Text>
                         <Badge
                           size="xs"
                           variant="light"
@@ -2533,13 +2513,6 @@ export default function ChannelConnect({
                 </div>
               ) : selectedChannel.id === 'openclaw-weixin' ? (
                 <div className="space-y-3">
-                  <Text size="sm" c="dimmed">
-                    点击“开始连接”后，Qclaw 会安装个人微信插件，并在下方命令输出里直接展示二维码。请使用微信扫码并在手机上确认授权。
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    如果二维码过期，安装器会自动刷新；连接成功后，账号会自动同步到控制面板中。当前版本暂不支持给其他微信用户做配对授权，仅扫码登录的这个微信账号可直接使用。
-                  </Text>
-
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="filled"
@@ -2633,12 +2606,6 @@ export default function ChannelConnect({
                 </div>
               ) : (
                 <>
-                  {selectedChannel.plugin && (
-                    <div className="text-xs app-text-muted app-bg-tertiary border app-border-light rounded px-2 py-1.5">
-                      将自动安装: {getChannelPluginInstallLabel(selectedChannel)}
-                    </div>
-                  )}
-
                   {selectedChannel.useQrBinding && selectedChannel.fields.length > 0 && (
                     <SegmentedControl
                       value={bindingMode}

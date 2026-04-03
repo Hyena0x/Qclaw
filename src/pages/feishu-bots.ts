@@ -34,6 +34,17 @@ function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function normalizeLegacyBotDisplayName(rawName: string, accountId: string, isDefault: boolean): string {
+  const normalized = normalizeText(rawName)
+  if (!normalized) return ''
+  if (isDefault && /^默认\s*bot$/i.test(normalized)) return '默认机器人'
+  const normalizedAccountId = normalizeText(accountId)
+  if (normalizedAccountId && normalized.toLowerCase() === `bot ${normalizedAccountId}`.toLowerCase()) {
+    return `机器人 ${normalizedAccountId}`
+  }
+  return normalized
+}
+
 function hasOwnRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -61,9 +72,10 @@ function ensureFeishuRoot(config: Record<string, any>): Record<string, any> {
 }
 
 function createDisplayName(rawName: string, accountId: string, isDefault: boolean): string {
-  if (rawName) return rawName
-  if (isDefault) return '默认 Bot'
-  return `Bot ${accountId}`
+  const normalizedLegacyName = normalizeLegacyBotDisplayName(rawName, accountId, isDefault)
+  if (normalizedLegacyName) return normalizedLegacyName
+  if (isDefault) return '默认机器人'
+  return `机器人 ${accountId}`
 }
 
 function createAccountId(name: string, appId: string, existingIds: Set<string>): string {
@@ -148,7 +160,7 @@ export function addFeishuBotConfig(
   const appId = normalizeText(input.appId)
   const appSecret = cloneFeishuSecretInput(input.appSecret)
 
-  if (!name) throw new Error('Bot 名称不能为空')
+  if (!name) throw new Error('机器人名称不能为空')
   if (!appId) throw new Error('App ID 不能为空')
   if (!hasFeishuSecretInput(appSecret)) throw new Error('App Secret 不能为空')
 

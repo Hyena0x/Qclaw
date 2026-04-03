@@ -105,7 +105,6 @@ async function appendFeishuInstallerDiag(
     // Best effort only; diagnostics must never break installer flow.
   }
 }
-
 async function ensureFeishuInstallerPromptHookFile(): Promise<string> {
   const hookPath = resolveFeishuInstallerPromptHookPath()
   await fs.promises.mkdir(path.dirname(hookPath), { recursive: true })

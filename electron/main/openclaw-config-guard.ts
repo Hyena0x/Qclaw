@@ -256,7 +256,7 @@ async function ensureManagedWritePreparation(
       snapshotCreated: false,
       snapshot: null,
       errorCode: 'baseline_backup_required',
-      message: '当前安装尚未完成首次基线备份，暂时不能修改共享配置。',
+      message: '当前安装尚未完成首次基线备份，暂时不能修改当前配置。',
     }
   }
 
@@ -280,7 +280,7 @@ async function ensureManagedWritePreparation(
       candidate: normalizedCandidate,
       snapshotCreated: true,
       snapshot,
-      message: '已在首次共享写入前创建配置快照。',
+      message: '已在首次写入当前配置前创建配置快照。',
     }
   } catch (error) {
     return {
@@ -404,7 +404,7 @@ export async function guardedWriteConfig(
       snapshot: preparation.snapshot,
       changedJsonPaths,
       ownershipSummary: summarizeOwnershipEntry(ownershipEntry),
-      message: '共享配置已通过 DataGuard 写入。',
+      message: '当前配置已通过 DataGuard 写入。',
     }
   } catch (error) {
     if (preparation.candidate) {
